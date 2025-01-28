@@ -9,7 +9,7 @@ async function generateData({ txtInput }) {
   try {
     // Generate output file name by adding "Processed" to the input file name
     const inputFileName = path.basename(txtInput, '.txt');  // Get file name without extension
-    const outputFileName = `${inputFileName}Processed.json`;  // Add "Processed" before the extension
+    const outputFileName = `${inputFileName}.json`;  // Add "Processed" before the extension
 
     const outputFilePath = path.join(outputFolderPath, outputFileName);
 
@@ -49,7 +49,10 @@ async function generateData({ txtInput }) {
   }
 }
 
-// generateData({ txtInput: './src/data/AllOELyrics.txt' });
+// generateData({ txtInput: './src/data/OELyricsTest.txt' });
+// await countWordsFromFile('./src/processedData/OELyricsTest.json')
 
-const wordMap = await countWordsFromFile('./src/processedData/AllOELyricsProcessed.json')
+generateData({ txtInput: './src/data/OELyrics.txt' });
+await countWordsFromFile('./src/processedData/OELyrics.json')
+
 
