@@ -1,12 +1,22 @@
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import path from 'path';
+import { sharpLibraryMusic } from '@quasar/extras/material-icons-sharp';
 
 
-async function lemmatize(wordCountMap) {
+async function lemmatize(wordCountMapOrArray) {
   return new Promise((resolve, reject) => {
     const process = spawn('python', ['./utils/lemmatize.py']);
-    process.stdin.write(JSON.stringify(Array.from(wordCountMap.entries())));
+    if(map instanceof Map){
+      process.stdin.write(JSON.stringify(Array.from(wordCountMapOrArray.entries())));
+    } else if(Array.isArray(wordCountMapOrArray)){
+      process.stdin.write(JSON.stringify(wordCountMapOrArray));
+    }
+    else{
+      console.warn("ERROR: in the function lemmatize only Map or Array can be provided, so it return Array, not a NULL, as it will return now! ")
+      return null
+    }
+
     process.stdin.end();
 
     let output = '';
@@ -63,8 +73,10 @@ export async  function countWordsFromFile(filePath) {
     // Use a for...of loop to handle async operations properly
     const totalWordCountMap = new Map();
     const wordBySong = {};
+    const songsMap = new Map();
     for (const song of jsonData.songs) {
       const songWordCountMap = new Map();
+      songsMap.set(song.title, song)
       // Extract text and normalize it
       const words = song.text
         .toLowerCase()  // Convert to lowercase
@@ -97,11 +109,16 @@ export async  function countWordsFromFile(filePath) {
       //   lemmatizedSongWordCountMap.set(lemmatizedKey, lemtValue + value)
       // }
 
-      const sortedLemmatizedSongWordCountObj = Object.fromEntries(sortedLemmatizedSongWordCountMap)
+      const sortedLemmatizedSongWordCountObj = Object.fromEntries(sortedLemmatizedSongWordCountMap);
+
+      const totalWordsQuantity = Object.keys(sortedLemmatizedSongWordCountObj).length;
+      const uniqueWordsCount = Object.values(sortedLemmatizedSongWordCountObj).reduce((sum, value) => sum + value, 0);
+
       wordBySong[song.title] = {
         words: sortedLemmatizedSongWordCountObj,
-        totalWordsQuantity: Object.keys(sortedLemmatizedSongWordCountObj).length,
-        uniqueWordsCount: Object.values(sortedLemmatizedSongWordCountObj).reduce((sum, value) => sum + value, 0)
+        totalWordsQuantity: totalWordsQuantity,
+        uniqueWordsCount: uniqueWordsCount,
+        lexicalUniquenessPercent: (uniqueWordsCount*100) / totalWordsQuantity
       };
       // console.log('lemmatizedSongWordCountMap', lemmatizedSongWordCountMap);
       sortedLemmatizedSongWordCountMap.forEach((value, key) => {
@@ -111,7 +128,45 @@ export async  function countWordsFromFile(filePath) {
       })
     }
 
-    const albums = {}
+    const wordByAlbum = {};
+    for (const album in jsonData.albums){
+      wordByAlbum[album.name] = {};
+      const albumObj = wordByAlbum[album.name];
+      albumObj.name = album.name;
+      albumObj.releaseDate = album.releaseDate;
+      albumObj.songsQuantity = album.songs.length;
+      albumObj.originalSongsQuantity = album.songs.reduce((count, songTitle) => {
+        const songReleaseDate = songsMap.get(songTitle)?.releaseDate;
+        if(!songReleaseDate) console.warn("For some reason the song listed in the albums pool is ont in the songs pool")
+        return songsMap.get(song)?.releaseDate === album.releaseDate ? count + 1 : count;
+      }, 0);
+      albumObj.originalityPercent = (songsQuantity * 100) / albumObj.originalSongsQuantity
+      albumObj.words = (async()=>{
+        const songWordCountMap = new Map();
+        for(const songTitle of album.songs){
+          const songObj = songsMap.get(songTitle);
+          const songWordCountMap = await lemmatize(songObj.text+songWordCountMap);
+        }
+        //rewrite album statistics
+        // album.songs.forEach((songTitle)=>{
+
+
+        //   //finish it
+        // })
+
+        return wordsMap
+      })()
+
+      // ()=>{
+      //   const albumWordCountMap = new Map();
+
+      //   return albumWordCountMap
+      // })()
+
+
+    }
+
+
 
     // for (const album of jsonData.albums){
 
@@ -129,7 +184,8 @@ export async  function countWordsFromFile(filePath) {
 
     const dataToWrite = {
       totalWordCount: totalWordCountObj,
-      wordCountBySong: wordBySong
+      wordCountBySong: wordBySong,
+      wordCountByAlbum: wordByAlbum
     }
 
     fs.writeFileSync(outputFilePath, JSON.stringify(dataToWrite, null, 2));
